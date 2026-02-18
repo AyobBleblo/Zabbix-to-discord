@@ -31,18 +31,45 @@ class ZabbixClint:
         return data["result"]
 
     def get_current_problems(self) -> List[Dict[str, Any]]:
-        return self._call("host.get", {
-            "output": "extend",
+
+        return self._call("problem.get", {
+            "output": ["name", "severity", "clock", "eventid"],
             "recent": False,
-            "sortfield": "host",
-            "sortorder": "ASC",
-            "selectHosts": ["hostid", "host" , "name"],
-            "selectInterfaces": ["ip"],
+            "sortfield": "eventid",
+            "sortorder": "DESC",
         })
 
-        # return self._call("host.get", {
-        #     "output": ["hostid", "host"],
-        #     "selectInterfaces": ["ip", "interfaceid"],
-        #     "recent": False,
+    def get_event_hosts(self, event_ids) -> List[Dict[str, Any]]:
+        return self._call("event.get", {
+            "eventids": event_ids,
+            "output": ["eventid"],
+            "selectHosts": ["hostid", "name"]
+        })
 
-        # })
+    def get_host_ips(self,host_ids):
+        hosts = self._call("host.get",{
+            "hostids":host_ids,
+            "output":["hostid"],
+            "selectInterfaces": ["ip","main"]
+        })
+
+        ip_map = {}
+
+        for host in hosts:
+            interfaces = host.get("interfaces", [])
+
+            ip = "N/A"
+
+            for interface in interfaces:
+                if interface.get("main") == "1":
+                    ip = interface.get("ip")
+                    break
+
+            
+
+            if ip == "N/A" and interfaces:
+                ip = interfaces[0].get("ip","N/A")
+
+            ip_map[host["hostid"]] = ip
+
+        return ip_map

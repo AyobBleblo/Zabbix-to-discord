@@ -2,8 +2,10 @@ from client import ZabbixClint
 from config import ZABBIX_URL, ZABBIX_TOKEN
 from datetime import datetime
 
+
 def format_time(timestamp: str) -> str:
     return datetime.fromtimestamp(int(timestamp)).strftime("%Y-%m-%d %H:%M:%S")
+
 
 def main():
 
@@ -15,24 +17,40 @@ def main():
     if not problems:
         print("No problems found")
         return
+
+    event_ids = [problem["eventid"] for problem in problems]
+    # print(problems[0])
+    # print(event_ids[0])
+    events = client.get_event_hosts(event_ids)
     print(f"{len(problems)} problems found")
+    # print(events[0])
+
+    event_host_map = {}
+
+    host_ids = []
+    for event in events:
+        hosts = event.get("hosts")
+
+        if hosts:
+            host = hosts[0]
+            event_host_map[event["eventid"]] = host
+            host_ids.append(host["hostid"])
+
+    ip_map = client.get_host_ips(host_ids)
+
     for problem in problems:
-        
-        # print(f"{format_time(problem['clock'])} {problem['name']} {problem['severity']}")
+        event_id = problem["eventid"]
+        host_info = event_host_map.get(event_id)
+        if not host_info:
+            continue
 
-        # print(f"{problem["interfaces"][0]["ip"]}    {problem["host"]}")
+        if problem["severity"] == "1":
+            host_name = host_info["name"]
+            host_id = host_info["hostid"]
+            ip = ip_map.get(host_id, "N/A")
 
-        hosts = problem.get("hosts", [])
-        interfaces = problem.get("interfaces", [])
-
-        host_name = hosts[0]["host"] if hosts else "Unknown host"
-        ip_address = interfaces[0]["ip"] if interfaces else "Unknown IP"
-        
-        print(f"{host_name} ({ip_address})")
-
-    print(problem)
-
-        
+            print(
+                f"{problem['name']} ({problem['severity']}) - {ip}     {host_name}")
 
 
 if __name__ == "__main__":
